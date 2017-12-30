@@ -1,0 +1,13 @@
+# RStudio files
+.Rproj.user
+.Ruserdata
+
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+
+# DS_Store files (on Macosx)
+.DS_Store
