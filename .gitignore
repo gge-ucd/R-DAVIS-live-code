@@ -11,3 +11,7 @@
 
 # DS_Store files (on Macosx)
 .DS_Store
+
+# ignore the Drobox file
+.dropbox
+"Icon\r"
