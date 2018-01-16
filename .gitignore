@@ -9,7 +9,7 @@
 # Session Data files
 .RData
 
-# DS_Store files (on Macosx)
+# ignore DS_Store files (on Macosx)
 .DS_Store
 
 # ignore the Drobox file
