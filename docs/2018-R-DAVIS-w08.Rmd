@@ -1,0 +1,186 @@
+---
+title: "TidyR and Joins"
+author: "R.D. Avis"
+date: "2/27/2018"
+output: html_document
+---
+
+# Purpose
+We are going to convert data from wide to long format and vice versa
+
+First we need to load our libraries
+
+```{r load_libraries, message = FALSE, warning = FALSE}
+library(tidyverse)
+```
+
+Now let's get our data
+
+```{r get_data}
+surveys <- read_csv("https://gge-ucd.github.io/R-DAVIS/data/portal_data_joined.csv")
+
+glimpse(surveys)
+```
+
+First, summarize these data.
+
+```{r summarize}
+surveys_gw <-
+  surveys %>%
+  filter(!is.na(weight)) %>% 
+  group_by(genus, plot_id) %>% 
+  summarize(mean_weight = mean(weight))
+
+glimpse(surveys_gw)
+
+head(surveys_gw)
+```
+
+Let's spread these data into wide format with a different plot id for each row, and different genera across columns
+
+```{r spread}
+surveys_gw %>% 
+  spread(key = genus, value = mean_weight)
+
+```
+
+Specify the fill value
+
+```{r fill_value_for_spread}
+surveys_gw %>% 
+  spread(key = genus, value = mean_weight, fill = 0)
+```
+
+Now we want to convert from wide format back to long format
+
+```{r}
+surveys_wide <-
+  surveys_gw %>% 
+  spread(key = genus, value = mean_weight, fill = 0)
+
+surveys_wide
+
+# When we gather(), we have to *think* about what the keys and values are
+
+surveys_wide %>% 
+  gather(key = genus, value = mean_weight, Baiomys:Spermophilus)
+
+surveys_wide %>% 
+  gather(key = the_genus, value = the_mean_weight, -plot_id)
+```
+# Challenge 1
+
+Spread the `surveys` data frame with year as columns, `plot_id` as rows, and the number of genera per plot per year as the values. You will need to summarize before reshaping, and use the function `n_distinct()` to get the number of unique genera within a partiuclar chunk of data.
+
+Hint: How do you need to summarize the data to count 
+
+```{r approach}
+surveys %>% 
+  group_by(year, plot_id) %>% 
+  summarize(unique_genera_count = n_distinct(genus)) %>% 
+  spread(key = year, value = unique_genera_count)
+
+```
+
+## Dealing with Directories and Knitting
+
+```{r make_a_csv}
+
+surveys %>% 
+  group_by(year, plot_id) %>% 
+  summarize(unique_genera_count = n_distinct(genus)) %>% 
+  spread(key = year, value = unique_genera_count) %>% 
+  write_csv(path="data/distinct_genus_by_year.csv")
+
+
+```
+
+## Dates and Times
+
+3 time classes in R:
+
+ - `Date`
+ - `POSIXct`
+ - `POSIXlt`
+
+### Just Dates to Start
+
+Let's make some dates:
+
+```{r sampleDates}
+# sample_dates <- c(2018-02-25) # whoa
+# need to quote the dates:
+sample_dates <- c("2018-02-25", "2018-02-23", "2017-03-01", "2016-03-07")
+# insider tip: if you highlight some code or text and hit shift + "
+
+```
+
+Let's convert to Date:
+
+```{r asDate}
+as.Date(sample_dates) # this won't work because no format of dates available
+
+# formatted
+sample_dates_formatted <- as.Date(sample_dates, format = "%Y-%m-%d")
+
+class(as.Date("2016/01/01", format="%Y/%m/%d"))
+class(as.Date("2016A01A01", format="%YA%mA%d"))
+```
+
+To figure out the code required to format your date try looking at `?strptime`
+
+## Using Lubridate
+
+With dates we can use the `ymd` or `mdy` or `dmy` combinations. They will generally work regardless of the separator (e.g., `/`) between each component (i.e., between the month and the day, or the day and year), as long as these are consistent across the vector or column of data.
+
+```{r}
+library(lubridate)
+
+sample_dates_lubridated <- ymd(sample_dates)
+str(sample_dates_lubridated)
+
+```
+
+We can use times as well. Let's make a short example dataset, and then use the paste function to paste our dates to our times, and finally format those datetimes.
+
+```{r times_dates_dat}
+
+# vector of 5 times (H:M)
+dummy_times_hm <- c("12:20", "12:30", "12:47", "08:39", "9:39") 
+dummy_dates_mdy <- c("2/4/18", "2/5/18", "2/9/18", "2/1/17", "2/16/17") 
+
+```
+
+Use the `paste0` function, which is just like `paste()` but makes the default separator a `,`.
+
+```{r pasteDatesTimes}
+
+# note we need to insert a space between our dates and our times
+datetimes_hm_mdy <- paste0(dummy_dates_mdy, " ", dummy_times_hm)
+
+# now convert with datetime
+str(datetimes_demo <- mdy_hm(datetimes_hm_mdy))
+```
+
+We could do the same thing if we had `year`, `month` and `day` columns and a time column.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
