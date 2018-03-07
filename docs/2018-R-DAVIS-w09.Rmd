@@ -1,0 +1,256 @@
+---
+title: "Lubridate and joins"
+author: "R.D. Avis"
+date: "3/6/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath("../"))
+```
+
+
+# More Lubridate
+
+Let's take a look at the `lubridate` package a little more, and take a few minutes to practice with a different set of data. We'll talk about a few additional functions:
+ - `yday()`
+ - `mday()`
+ - `floor/ceiling_date`
+ - `round_date`
+
+```{r loadlibrary}
+
+suppressPackageStartupMessages({
+  library(lubridate);
+  library(tidyverse)
+})
+
+```
+
+
+## Read in our logger data
+
+Let's get part A and part B into our R environment.
+
+```{r loadloggerdata}
+loggerA <- read_csv(file="https://gge-ucd.github.io/R-DAVIS/data/2015_NFA_solinst_08_05_A.csv", skip = 13)
+
+loggerB <- read_csv(file="https://gge-ucd.github.io/R-DAVIS/data/2015_NFA_solinst_08_05_B.csv", skip = 13)
+
+summary(loggerA)
+
+```
+
+### Make a datetime column
+
+Using `paste` or `paste0`
+ - `paste0` assumes separator between fields you are pasting together is a comma (`,`)
+ - `paste()` is more flexible and you have to specify a column delimitor
+ 
+```{r makeDatetime}
+
+loggerA <- loggerA %>% 
+  mutate(datetime = paste0(Date," ", Time))
+glimpse(loggerA)
+
+loggerB <- loggerB %>% 
+  mutate(datetime = paste0(Date," ", Time))
+glimpse(loggerB)
+head(loggerB)
+
+# lets use lubridate to format to datetime
+loggerA <- loggerA %>% 
+  mutate(datetime = mdy_hms(datetime)) # this adds seconds even though our data has no seconds
+glimpse(loggerA)
+
+# same as above
+#loggerA$datetime <- mdy_hms(loggerA$datetime)
+#glimpse(loggerA)
+head(loggerA$datetime)
+
+# do same for logger B but with timezone
+Sys.timezone()
+loggerB$datetime <- mdy_hms(loggerB$datetime, tz = "America/Los_Angeles")
+
+head(loggerB$datetime)
+
+# select the columns we're interested in:
+loggerA <- loggerA %>% select(datetime, Level, Temperature)
+loggerB <- loggerB %>% select(datetime, Level, Temperature)
+```
+
+## A few other lubridate functions
+
+```{r otherLubridate}
+# lubridate:: to view functions
+glimpse(loggerB)
+floor_date(loggerB$datetime, unit = "month") %>%  head()
+ceiling_date(loggerB$datetime, unit="month") %>% head()
+
+round_date(loggerB$datetime, unit="day") %>%  head
+round_date(loggerB$datetime, unit="month") %>%  head
+
+yday(loggerB$datetime)
+month()
+week()
+```
+
+## joins with lubridate
+
+We want to join these datasets, knowing they overlap. How do we do this and retain only distinct data?
+
+```{r}
+
+
+fullLogger <- full_join(loggerA, loggerB) # appends all data together
+nrow(loggerA) + nrow(loggerB)
+
+fullogger2 <- full_join(loggerA, loggerB, by="datetime") # this works but duplicates columns: 
+nrow(fullogger2) - 38014
+
+fullogger3 <- union(loggerA, loggerB) # this works and avoids the extra columns but still have duplicate rows
+nrow(fullogger3) - 38014
+
+fullLogger4 <- full_join(loggerA, loggerB) %>%  # appends all data together 
+  distinct(datetime, .keep_all = T)# and keeps distinct rows from datetime
+
+# now let's clean and rename
+clean_logger <- fullogger2 %>% 
+  select(datetime, starts_with("Level")) %>% 
+  rename(level=Level.x)
+```
+
+# Some practice with joins
+
+```{r practice_joins}
+plots <- read_csv("https://gge-ucd.github.io/R-DAVIS/data/plots.csv")
+surveys <- read_csv("https://gge-ucd.github.io/R-DAVIS/data/surveys.csv")
+
+# species <- read_csv("https://gge-ucd.github.io/R-DAVIS/data/species.csv")
+
+glimpse(plots)
+glimpse(surveys)
+
+surveys %>% 
+  left_join(plots) %>% 
+  select(record_id, plot_id, sex, plot_type)
+```
+
+# Challenge
+
+Write some code that returns the number of rodents observed in each plot in each year. Start by reading in the species dataframe.
+
+```{r}
+species <- read_csv("https://gge-ucd.github.io/R-DAVIS/data/species.csv")
+glimpse(surveys)
+glimpse(species)
+```
+
+Hint: All the information you need isn’t contained in one single dataframe just yet. The “taxa” information is contained in the species dataframe, and the observation data is contained in the surveys dataframe. Write some code that joins the species and survey tables together on a common column. What are the common columns?
+
+```{r first_the_join}
+joined_surveys <-
+  surveys %>% 
+  left_join(species)
+
+glimpse(joined_surveys)
+```
+
+Hint: How would you use a split-apply-combine strategy to count the number of observations per taxa, per year? Which part of this hint refers to the “splitting”, and which part refers to the “applying”?
+
+```{r the_summarize}
+joined_surveys %>% 
+  filter(taxa == "Rodent") %>% 
+  group_by(plot_id, year) %>% 
+  summarize(n = n())
+
+joined_surveys %>% 
+  filter(taxa == "Rodent") %>% 
+  group_by(plot_id, year) %>% 
+  tally()
+
+```
+
+Hint: How would you subset the resulting dataframe to just include the rodents?
+
+# Challenge II
+
+Write some code that returns the total number of rodents in each genus caught in the different plot types.
+
+Hint: Not all the data you need are contained in 1 dataframe. The plot_type data are in the plots dataframe, the taxa data are in the species dataframe, and the observation data are in the surveys dataframe. Start by joining these three dataframes together.
+
+Hint: Think “split-apply-combine”. We want to count the number of observations in each group defined by plot_type and genus combinations. That is, what is the count of observations per plot_type, per genus for just the Rodent taxa.
+
+```{r my_solution}
+genus_counts <-
+  surveys %>%
+  left_join(plots) %>% 
+  left_join(species) %>% 
+  filter(taxa == "Rodent") %>% 
+  group_by(plot_type, genus) %>% 
+  tally()
+
+genus_counts
+
+# Alternative
+genus_counts <-
+  surveys %>%
+  left_join(plots) %>% 
+  left_join(species) %>% 
+  group_by(plot_type, genus, taxa) %>% 
+  tally() %>% 
+  filter(taxa == "Rodent")
+
+```
+
+
+# Starting new spatial project
+
+Install these packages for w10.
+
+```{r}
+# libraries we want for spatial mapping
+
+library(sf)
+library(maps)
+library(rgdal)
+library(maptools)
+library(mapview)
+library(leaflet)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
